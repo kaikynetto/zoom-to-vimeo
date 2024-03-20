@@ -1,6 +1,8 @@
 package com.example.zoomtovimeo.controller;
 
 import com.example.zoomtovimeo.utils.HMACUtil;
+import com.example.zoomtovimeo.utils.VideoDownloader;
+import com.example.zoomtovimeo.utils.VimeoUploader;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,7 +27,6 @@ public class WebhookController {
         String timestamp = req.getHeader("x-zm-request-timestamp");
         String xZmSignature = req.getHeader("x-zm-signature");
 
-        // Lendo o corpo da solicitação e convertendo para String
         StringBuilder bodyBuilder = new StringBuilder();
         try (BufferedReader reader = req.getReader()) {
             String line;
@@ -36,7 +38,6 @@ public class WebhookController {
             return ResponseEntity.badRequest().body("Erro ao ler o corpo da solicitação.");
         }
 
-        // Convertendo o corpo da solicitação para JSON
         ObjectMapper objectMapper = new ObjectMapper();
         Payload payload;
         try {
@@ -49,13 +50,10 @@ public class WebhookController {
         String event = payload.getEvent();
         System.out.println("EVENTO: " +event);
 
-        // Validando o campo 'event'
         if(!event.equals("endpoint.url_validation")) {
 
-        // Extraindo o valor de plainToken do objeto Payload
         String plainToken = payload.getPayload().getPlainToken();
         
-        // Construindo a mensagem no formato especificado
         String message = "v0:" + timestamp + ":" + bodyBuilder.toString();
         String secretKey = "raPylG4GQfKmdKuYofmMHA";
         String hashForVerify = HMACUtil.generateHMAC(message, secretKey);
@@ -63,13 +61,12 @@ public class WebhookController {
         String signature = "v0="+hashForVerify;
         
         if(signature.equals(xZmSignature)) {
-                    String hashForValidate = HMACUtil.generateHMAC(plainToken, secretKey);
+                String hashForValidate = HMACUtil.generateHMAC(plainToken, secretKey);
                     
                 Map<String, Object> responseMap = new LinkedHashMap<>();
                 responseMap.put("plainToken", plainToken);
                 responseMap.put("encryptedToken", hashForValidate);
-                // responseMap.put("message", messageMap);
-        
+
                 try {
                     String responseBody = objectMapper.writeValueAsString(responseMap);
                     System.out.println("Resposta JSON: " + responseBody); // Imprime a resposta JSON
@@ -80,21 +77,34 @@ public class WebhookController {
                 }
            
         } else if(event.equals("recording.completed")) {
-            // Acessando a lista de recording_files
-            List<RecordingFile> recordingFiles = payload.getPayload().getObject().getRecording_files();
-            
-            // Iterando sobre os arquivos de gravação
-            for (RecordingFile recordingFile : recordingFiles) {
-                // Verificando se o recording_type é igual ao valor desejado
-                if ("shared_screen_with_speaker_view".equals(recordingFile.getRecording_type())) {
-                    String downloadUrl = recordingFile.getDownload_url();
-                    
-                    System.out.println("Download URL do recording_type desejado: " + downloadUrl);
-                    
-                    // Retorna a resposta HTTP com sucesso
-                    return ResponseEntity.ok().body("Download URL do recording_type desejado: " + downloadUrl);
+             List<RecordingFile> recordingFiles = payload.getPayload().getObject().getRecording_files();
+
+                for (RecordingFile recordingFile : recordingFiles) {
+                    if ("shared_screen_with_speaker_view".equals(recordingFile.getRecording_type())) {
+                        String downloadUrl = recordingFile.getDownload_url();
+                        String saveFilePath = "video.mp4";
+
+                        try {
+                            VideoDownloader.downloadVideo(downloadUrl, saveFilePath);
+                            System.out.println("Download completo!");
+
+                            // try {
+                            //     File videoFile = new File("video.mp4");
+                            //     String response = VimeoUploader.uploadVideo(videoFile);
+                            //     System.out.println(response);
+                            // } catch (IOException e){
+                            //     e.printStackTrace();
+                            // }
+
+
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                            return ResponseEntity.badRequest().body("Erro ao baixar o vídeo.");
+                        }
+                        return ResponseEntity.ok().body("Download URL do recording_type desejado: " + downloadUrl);
+                    }
                 }
-            }
+
             
             // Se nenhum arquivo de gravação com o recording_type desejado for encontrado
             System.out.println("Nenhum arquivo de gravação com o recording_type desejado foi encontrado.");
@@ -102,15 +112,6 @@ public class WebhookController {
             // Retorna a resposta HTTP com uma mensagem indicando que nenhum arquivo foi encontrado
             return ResponseEntity.ok().body("Nenhum arquivo de gravação com o recording_type desejado foi encontrado.");
         } else {
-            // ObjectMapper objectMapper2 = new ObjectMapper();
-            // String payloadContentJson;
-            // try {
-            //     payloadContentJson = objectMapper.writeValueAsString(payload.getPayload());
-            //     System.out.println("Payload JSON: " + payloadContentJson);
-            // } catch (JsonProcessingException e) {
-            //     e.printStackTrace();
-            //     // Trate a exceção adequadamente
-            // }
             return ResponseEntity.ok().body("teste!");
         }
         } else {
@@ -333,21 +334,20 @@ private String recording_play_passcode;
         private String file_size;
         
         @JsonProperty("play_url")
-        private String play_url; // Adicionando a propriedade "play_url"
+        private String play_url;
     
         @JsonProperty("download_url")
-        private String download_url; // Adicionando a propriedade "play_url"
+        private String download_url;
 
         public String getDownload_url() {
             return download_url;
         }
 
         @JsonProperty("status")
-        private String status; // Adicionando a propriedade "play_url"
+        private String status;
 
         @JsonProperty("recording_type")
-        private String recording_type; // Adicionando a propriedade "play_url"
-        // Getters e setters
+        private String recording_type;
 
         public String getRecording_type() {
             return recording_type;
