@@ -1,6 +1,7 @@
 package com.example.zoomtovimeo.controller;
 
 import com.example.zoomtovimeo.utils.HMACUtil;
+import com.example.zoomtovimeo.utils.VideoDeleter;
 import com.example.zoomtovimeo.utils.VideoDownloader;
 import com.example.zoomtovimeo.utils.VimeoUploader;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -15,6 +16,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +53,9 @@ public class WebhookController {
         String event = payload.getEvent();
         System.out.println("EVENTO: " +event);
 
-        if(!event.equals("endpoint.url_validation")) {
+       
+      
+        if(event.equals("endpoint.url_validation")) {
 
         String plainToken = payload.getPayload().getPlainToken();
         
@@ -69,55 +74,55 @@ public class WebhookController {
 
                 try {
                     String responseBody = objectMapper.writeValueAsString(responseMap);
-                    System.out.println("Resposta JSON: " + responseBody); // Imprime a resposta JSON
+                    System.out.println("Resposta JSON: " + responseBody);
                     return ResponseEntity.ok().body(responseBody);
                 } catch (IOException e) {
                     e.printStackTrace();
                     return ResponseEntity.badRequest().body("Erro ao gerar a resposta JSON.");
                 }
            
-        } else if(event.equals("recording.completed")) {
-             List<RecordingFile> recordingFiles = payload.getPayload().getObject().getRecording_files();
-
-                for (RecordingFile recordingFile : recordingFiles) {
-                    if ("shared_screen_with_speaker_view".equals(recordingFile.getRecording_type())) {
-                        String downloadUrl = recordingFile.getDownload_url();
-                        String saveFilePath = "video.mp4";
-
-                        try {
-                            VideoDownloader.downloadVideo(downloadUrl, saveFilePath);
-                            System.out.println("Download completo!");
-
-                            // try {
-                            //     File videoFile = new File("video.mp4");
-                            //     String response = VimeoUploader.uploadVideo(videoFile);
-                            //     System.out.println(response);
-                            // } catch (IOException e){
-                            //     e.printStackTrace();
-                            // }
-
-
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                            return ResponseEntity.badRequest().body("Erro ao baixar o vídeo.");
-                        }
-                        return ResponseEntity.ok().body("Download URL do recording_type desejado: " + downloadUrl);
-                    }
-                }
-
-            
-            // Se nenhum arquivo de gravação com o recording_type desejado for encontrado
-            System.out.println("Nenhum arquivo de gravação com o recording_type desejado foi encontrado.");
-            
-            // Retorna a resposta HTTP com uma mensagem indicando que nenhum arquivo foi encontrado
-            return ResponseEntity.ok().body("Nenhum arquivo de gravação com o recording_type desejado foi encontrado.");
-        } else {
+        }else {
             return ResponseEntity.ok().body("teste!");
         }
-        } else {
-            System.out.println("event");
-            return ResponseEntity.ok().body("teste!");
+        } else   if(event.equals("recording.completed")) {
+            List<RecordingFile> recordingFiles = payload.getPayload().getObject().getRecording_files();
 
+               for (RecordingFile recordingFile : recordingFiles) {
+                   if ("shared_screen_with_speaker_view".equals(recordingFile.getRecording_type())) {
+                       String downloadUrl = recordingFile.getDownload_url();
+                       String saveFilePath = "video.mp4";
+
+                       try {
+                        
+                           VideoDownloader.downloadVideo(downloadUrl, saveFilePath);
+                           System.out.println("Download completo!");
+
+                           try {
+                               String url = "https://send-video-to-vimeo.vercel.app/upload";
+                                String videoFilePath = "video.mp4"; // Substitua pelo caminho do seu vídeo
+
+                                    byte[] videoBytes = Files.readAllBytes(Paths.get(videoFilePath));
+                                    VideoUploader.uploadVideo(url, videoBytes);
+                                    VideoDeleter.deleteVideo(videoFilePath);
+                                return ResponseEntity.ok("Vídeo enviado com sucesso para o servidor.");
+                           } catch (IOException e){
+                               e.printStackTrace();
+                           }
+
+
+                       } catch (IOException e) {
+                           e.printStackTrace();
+                           return ResponseEntity.badRequest().body("Erro ao baixar o vídeo.");
+                       }
+                       return ResponseEntity.ok().body("Download URL do recording_type desejado: " + downloadUrl);
+                   }
+               }
+
+           System.out.println("Nenhum arquivo de gravação com o recording_type desejado foi encontrado.");
+           
+           return ResponseEntity.ok().body("Nenhum arquivo de gravação com o recording_type desejado foi encontrado.");
+       } else {
+            return ResponseEntity.ok().body("!");
         }
     }
 
@@ -166,7 +171,7 @@ public class WebhookController {
         private String event;
         
 
-        @JsonProperty("object") // Ajuste para incluir o campo "event" dentro de "object"
+        @JsonProperty("object")
         private PayloadObject object;
 
         
@@ -174,7 +179,7 @@ public class WebhookController {
             return account_id;
         }
 
-        @JsonProperty("account_id") // Ajuste para incluir o campo "event" dentro de "object"
+        @JsonProperty("account_id")
         private String account_id;
 
         
@@ -204,7 +209,7 @@ public class WebhookController {
     }
 
     static class PayloadObject {
-        @JsonProperty("event") // Campo "event" dentro de "object"
+        @JsonProperty("event")
         private String event;
 
         
