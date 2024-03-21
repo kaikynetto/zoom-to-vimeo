@@ -98,7 +98,7 @@ public class WebhookController {
                            System.out.println("Download completo!");
 
                            try {
-                               String url = "https://send-video-to-vimeo.vercel.app/upload";
+                               String url = "https://vimeo-uploader.vercel.app/upload";
                                 String videoFilePath = "video.mp4"; // Substitua pelo caminho do seu vídeo
 
                                     byte[] videoBytes = Files.readAllBytes(Paths.get(videoFilePath));

@@ -15,7 +15,7 @@ public class UploadVideoController {
     @PostMapping("/upload")
     public ResponseEntity<String> handleEntity() {
         try {
-            String url = "http://localhost:3000/upload";
+            String url = "https://vimeo-uploader.vercel.app/upload";
             String videoFilePath = "video.mp4"; // Substitua pelo caminho do seu vídeo
 
                 byte[] videoBytes = Files.readAllBytes(Paths.get(videoFilePath));
